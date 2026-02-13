@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.logger import SecurityLogger
 from scanners.aws_scanner import AWSScanner
 from attack_simulator.attack_chains import AttackChainSimulator
+from attack_graph.path_analyzer import AttackPathGraph
+from baseline.drift_detector import BaselineDriftDetector
+from risk_scoring.context_scorer import ContextAwareRiskScorer
 
 try:
     from scanners.gcp_scanner import GCPScanner
@@ -28,8 +31,8 @@ class ProfessionalCloudTool:
     def __init__(self, root):
         self.root = root
         self.root.title("Cloud Security Scanner - Professional Edition")
-        self.root.geometry("1200x750")
-        self.root.minsize(1200, 750)
+        self.root.geometry("1400x900")
+        self.root.minsize(1400, 900)
         self.root.configure(bg="#1a1a2e")
 
         self.credentials = {}
@@ -37,6 +40,11 @@ class ProfessionalCloudTool:
 
         self.last_findings = []
         self.last_attack_chains = []
+        self.last_attack_paths = []
+        self.last_drift_report = None
+        
+        self.drift_detector = BaselineDriftDetector()
+        self.risk_scorer = ContextAwareRiskScorer()
 
         self.bg_dark = "#1a1a2e"
         self.bg_card = "#16213e"
@@ -54,33 +62,33 @@ class ProfessionalCloudTool:
 
     def create_ui(self):
         header = tk.Frame(self.root, bg=self.bg_dark)
-        header.pack(fill="x", padx=20, pady=15)
+        header.pack(fill="x", padx=30, pady=20)
 
         tk.Label(
             header, text="CLOUD SECURITY SCANNER",
-            font=("Arial", 26, "bold"),
+            font=("Arial", 32, "bold"),
             bg=self.bg_dark, fg=self.text_white
         ).pack(anchor="w")
 
         tk.Label(
             header, text="Multi-Cloud Automated Pentesting & Security Auditor",
-            font=("Arial", 12),
+            font=("Arial", 14),
             bg=self.bg_dark, fg=self.text_gray
         ).pack(anchor="w")
 
         main = tk.Frame(self.root, bg=self.bg_dark)
-        main.pack(fill="both", expand=True, padx=20, pady=10)
+        main.pack(fill="both", expand=True, padx=30, pady=15)
 
         # -------- LEFT PANEL --------
-        left = tk.Frame(main, bg=self.bg_card, width=300)
-        left.pack(side="left", fill="y", padx=(0, 10))
+        left = tk.Frame(main, bg=self.bg_card, width=350)
+        left.pack(side="left", fill="y", padx=(0, 15))
         left.pack_propagate(False)
 
         tk.Label(
             left, text="CLOUD PROVIDER",
-            font=("Arial", 14, "bold"),
+            font=("Arial", 16, "bold"),
             bg=self.bg_card, fg=self.text_white
-        ).pack(pady=20)
+        ).pack(pady=25)
 
         self.provider_var = tk.StringVar(value="aws")
 
@@ -89,24 +97,25 @@ class ProfessionalCloudTool:
                 left, text=name.upper(),
                 variable=self.provider_var, value=name,
                 indicatoron=False,
-                font=("Arial", 12, "bold"),
+                font=("Arial", 14, "bold"),
                 bg=self.accent, fg="white",
                 selectcolor=color,
                 height=2,
                 command=self.provider_changed
             )
-            btn.pack(fill="x", padx=20, pady=5)
+            btn.pack(fill="x", padx=25, pady=8)
 
         tk.Button(
             left, text="CONFIGURE CREDENTIALS",
             command=self.open_credentials_modal,
             bg=self.accent, fg="white",
-            font=("Arial", 11, "bold"),
+            font=("Arial", 13, "bold"),
             height=2
-        ).pack(fill="x", padx=20, pady=15)
+        ).pack(fill="x", padx=25, pady=20)
 
         self.config_status = tk.Label(
             left, text="Not Configured",
+            font=("Arial", 11),
             bg=self.bg_card, fg="#ff4757"
         )
         self.config_status.pack()
@@ -114,75 +123,82 @@ class ProfessionalCloudTool:
         self.scan_btn = tk.Button(
             left, text="START SECURITY SCAN",
             bg="#00ff88", fg="#000",
-            font=("Arial", 13, "bold"),
+            font=("Arial", 15, "bold"),
             height=2,
             state="disabled",
             command=self.start_scan
         )
-        self.scan_btn.pack(fill="x", padx=20, pady=25)
+        self.scan_btn.pack(fill="x", padx=25, pady=30)
 
         # -------- RIGHT PANEL --------
         right = tk.Frame(main, bg=self.bg_card)
         right.pack(side="right", fill="both", expand=True)
 
         notebook = ttk.Notebook(right)
-        notebook.pack(fill="both", expand=True, padx=20, pady=20)
+        notebook.pack(fill="both", expand=True, padx=25, pady=25)
 
         # LOG TAB
         log_tab = tk.Frame(notebook, bg="#0d1117")
         notebook.add(log_tab, text="📋 Scan Logs")
 
-        log_header = tk.Frame(log_tab, bg="#161b22", height=50)
+        log_header = tk.Frame(log_tab, bg="#161b22", height=80)
         log_header.pack(fill="x")
         log_header.pack_propagate(False)
 
         tk.Label(
             log_header, text="🔍 REAL-TIME SCAN OUTPUT",
-            font=("Arial", 12, "bold"),
+            font=("Arial", 16, "bold"),
             bg="#161b22", fg="#58a6ff"
-        ).pack(side="left", padx=15, pady=10)
+        ).pack(side="left", padx=25, pady=20)
 
         self.status_label = tk.Label(
             log_header, text="● Ready",
-            font=("Arial", 10, "bold"),
+            font=("Arial", 13, "bold"),
             bg="#161b22", fg="#00ff88"
         )
-        self.status_label.pack(side="right", padx=15)
+        self.status_label.pack(side="right", padx=25)
+
+        log_container = tk.Frame(log_tab, bg="#0d1117")
+        log_container.pack(fill="both", expand=True, padx=25, pady=25)
 
         self.log_text = scrolledtext.ScrolledText(
-            log_tab,
+            log_container,
             bg="#0d1117",
             fg="#58a6ff",
-            font=("Consolas", 10),
+            font=("Consolas", 12),
             insertbackground="white",
-            relief="flat",
-            borderwidth=0
+            relief="solid",
+            borderwidth=2,
+            wrap="word"
         )
-        self.log_text.pack(fill="both", expand=True, padx=15, pady=15)
+        self.log_text.pack(fill="both", expand=True)
 
         # METRICS TAB
         metrics_tab = tk.Frame(notebook, bg="#0d1117")
         notebook.add(metrics_tab, text="📊 Metrics")
 
         # Header
-        metrics_header = tk.Frame(metrics_tab, bg="#161b22", height=50)
+        metrics_header = tk.Frame(metrics_tab, bg="#161b22", height=80)
         metrics_header.pack(fill="x")
         metrics_header.pack_propagate(False)
         tk.Label(
             metrics_header, text="📊 SECURITY METRICS DASHBOARD",
-            font=("Arial", 12, "bold"),
+            font=("Arial", 16, "bold"),
             bg="#161b22", fg="#58a6ff"
-        ).pack(side="left", padx=15, pady=10)
+        ).pack(side="left", padx=25, pady=20)
+
+        metrics_content = tk.Frame(metrics_tab, bg="#0d1117")
+        metrics_content.pack(fill="both", expand=True, padx=25, pady=25)
 
         # Severity Counts
-        severity_frame = tk.Frame(metrics_tab, bg="#0d1117")
-        severity_frame.pack(fill="x", padx=20, pady=20)
+        severity_frame = tk.Frame(metrics_content, bg="#0d1117")
+        severity_frame.pack(fill="x", pady=(0, 25))
 
         tk.Label(
             severity_frame, text="🔒 VULNERABILITY SEVERITY",
-            font=("Arial", 13, "bold"),
+            font=("Arial", 15, "bold"),
             bg="#0d1117", fg="white"
-        ).pack(pady=(0, 15))
+        ).pack(pady=(0, 25))
 
         counts_frame = tk.Frame(severity_frame, bg="#0d1117")
         counts_frame.pack()
@@ -193,32 +209,32 @@ class ProfessionalCloudTool:
         self.low_label = self.create_metric_box(counts_frame, "LOW", "0", "#3498db")
 
         # Divider
-        tk.Frame(metrics_tab, bg="#30363d", height=2).pack(fill="x", padx=20, pady=15)
+        tk.Frame(metrics_content, bg="#30363d", height=2).pack(fill="x", pady=25)
 
         # Attack Scenarios
-        attack_frame = tk.Frame(metrics_tab, bg="#0d1117")
-        attack_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        attack_frame = tk.Frame(metrics_content, bg="#0d1117")
+        attack_frame.pack(fill="both", expand=True)
 
         tk.Label(
             attack_frame, text="⚠️ ATTACK SIMULATION SCENARIOS",
-            font=("Arial", 13, "bold"),
+            font=("Arial", 15, "bold"),
             bg="#0d1117", fg="white"
-        ).pack(pady=(0, 10))
+        ).pack(pady=(0, 20))
 
-        attack_container = tk.Frame(attack_frame, bg="#161b22", relief="solid", borderwidth=1)
+        attack_container = tk.Frame(attack_frame, bg="#161b22", relief="solid", borderwidth=2)
         attack_container.pack(fill="both", expand=True)
 
         self.attack_text = scrolledtext.ScrolledText(
             attack_container,
             bg="#0d1117",
             fg="#ffc107",
-            font=("Consolas", 10),
-            height=8,
+            font=("Consolas", 12),
             insertbackground="white",
             relief="flat",
-            borderwidth=0
+            borderwidth=0,
+            wrap="word"
         )
-        self.attack_text.pack(fill="both", expand=True, padx=2, pady=2)
+        self.attack_text.pack(fill="both", expand=True, padx=3, pady=3)
         self.attack_text.insert("1.0", "⏳ No attack scenarios generated yet. Run a scan first.")
         self.attack_text.config(state="disabled")
 
@@ -302,6 +318,66 @@ class ProfessionalCloudTool:
         )
         self.json_btn.pack(fill="x", padx=20, pady=(0, 15))
 
+        # ATTACK PATHS TAB
+        paths_tab = tk.Frame(notebook, bg="#0d1117")
+        notebook.add(paths_tab, text="🎯 Attack Paths")
+
+        paths_header = tk.Frame(paths_tab, bg="#161b22", height=80)
+        paths_header.pack(fill="x")
+        paths_header.pack_propagate(False)
+        tk.Label(
+            paths_header, text="🎯 ATTACK PATH ANALYSIS",
+            font=("Arial", 16, "bold"),
+            bg="#161b22", fg="#58a6ff"
+        ).pack(side="left", padx=25, pady=20)
+
+        paths_container = tk.Frame(paths_tab, bg="#0d1117")
+        paths_container.pack(fill="both", expand=True, padx=25, pady=25)
+
+        self.paths_text = scrolledtext.ScrolledText(
+            paths_container,
+            bg="#0d1117",
+            fg="#ff6b6b",
+            font=("Consolas", 12),
+            insertbackground="white",
+            relief="solid",
+            borderwidth=2,
+            wrap="word"
+        )
+        self.paths_text.pack(fill="both", expand=True)
+        self.paths_text.insert("1.0", "⏳ No attack paths analyzed yet. Run a scan first.")
+        self.paths_text.config(state="disabled")
+
+        # DRIFT TAB
+        drift_tab = tk.Frame(notebook, bg="#0d1117")
+        notebook.add(drift_tab, text="📊 Drift")
+
+        drift_header = tk.Frame(drift_tab, bg="#161b22", height=80)
+        drift_header.pack(fill="x")
+        drift_header.pack_propagate(False)
+        tk.Label(
+            drift_header, text="📊 BASELINE DRIFT DETECTION",
+            font=("Arial", 16, "bold"),
+            bg="#161b22", fg="#58a6ff"
+        ).pack(side="left", padx=25, pady=20)
+
+        drift_container = tk.Frame(drift_tab, bg="#0d1117")
+        drift_container.pack(fill="both", expand=True, padx=25, pady=25)
+
+        self.drift_text = scrolledtext.ScrolledText(
+            drift_container,
+            bg="#0d1117",
+            fg="#a29bfe",
+            font=("Consolas", 12),
+            insertbackground="white",
+            relief="solid",
+            borderwidth=2,
+            wrap="word"
+        )
+        self.drift_text.pack(fill="both", expand=True)
+        self.drift_text.insert("1.0", "⏳ No drift analysis yet. Run a scan first.")
+        self.drift_text.config(state="disabled")
+
         self.log("System initialized. Ready to scan.", "success")
 
     # ---------------- LOGGING ----------------
@@ -313,25 +389,25 @@ class ProfessionalCloudTool:
         self.root.after(0, write)
 
     def create_metric_box(self, parent, label, value, color):
-        box = tk.Frame(parent, bg="#161b22", relief="solid", borderwidth=1)
-        box.pack(side="left", padx=8)
+        box = tk.Frame(parent, bg="#161b22", relief="solid", borderwidth=2)
+        box.pack(side="left", padx=15)
         
-        inner = tk.Frame(box, bg=color, width=110, height=90)
-        inner.pack(padx=2, pady=2)
+        inner = tk.Frame(box, bg=color, width=170, height=130)
+        inner.pack(padx=3, pady=3)
         inner.pack_propagate(False)
         
         val_label = tk.Label(
             inner, text=value,
-            font=("Arial", 28, "bold"),
+            font=("Arial", 38, "bold"),
             bg=color, fg="white"
         )
-        val_label.pack(expand=True, pady=(10, 0))
+        val_label.pack(expand=True, pady=(20, 0))
         
         tk.Label(
             inner, text=label,
-            font=("Arial", 9, "bold"),
+            font=("Arial", 11, "bold"),
             bg=color, fg="white"
-        ).pack(pady=(0, 10))
+        ).pack(pady=(0, 20))
         
         return val_label
 
@@ -360,6 +436,45 @@ class ProfessionalCloudTool:
             self.attack_text.insert(tk.END, "✓ No attack scenarios detected. Environment appears secure.")
         
         self.attack_text.config(state="disabled")
+
+        # Update attack paths
+        self.paths_text.config(state="normal")
+        self.paths_text.delete("1.0", tk.END)
+        
+        if self.last_attack_paths:
+            for i, path in enumerate(self.last_attack_paths, 1):
+                self.paths_text.insert(tk.END, f"\n━━━ ATTACK PATH #{i} ━━━\n")
+                self.paths_text.insert(tk.END, f"🔥 Risk Score: {path['risk_score']:.1f}/10\n")
+                self.paths_text.insert(tk.END, f"🛤️ Path: {path['path_summary']}\n")
+                self.paths_text.insert(tk.END, f"📝 Impact: {path['impact']}\n\n")
+        else:
+            self.paths_text.insert(tk.END, "✓ No critical attack paths identified.")
+        
+        self.paths_text.config(state="disabled")
+
+        # Update drift
+        self.drift_text.config(state="normal")
+        self.drift_text.delete("1.0", tk.END)
+        
+        if self.last_drift_report:
+            self.drift_text.insert(tk.END, f"📊 DRIFT ANALYSIS REPORT\n\n")
+            self.drift_text.insert(tk.END, f"✅ Fixed Issues: {self.last_drift_report['fixed_count']}\n")
+            self.drift_text.insert(tk.END, f"⚠️ New Risks: {self.last_drift_report['new_count']}\n")
+            self.drift_text.insert(tk.END, f"🔺 Worsened: {self.last_drift_report['worsened_count']}\n\n")
+            
+            if self.last_drift_report['new_risks']:
+                self.drift_text.insert(tk.END, "\n━━━ NEW RISKS ━━━\n")
+                for risk in self.last_drift_report['new_risks'][:5]:
+                    self.drift_text.insert(tk.END, f"  • [{risk['severity']}] {risk['title']}\n")
+            
+            if self.last_drift_report['fixed_issues']:
+                self.drift_text.insert(tk.END, "\n━━━ FIXED ISSUES ━━━\n")
+                for fix in self.last_drift_report['fixed_issues'][:5]:
+                    self.drift_text.insert(tk.END, f"  ✓ [{fix['severity']}] {fix['title']}\n")
+        else:
+            self.drift_text.insert(tk.END, "⏳ No drift analysis yet. Run a scan first.")
+        
+        self.drift_text.config(state="disabled")
 
     # ---------------- PROVIDER ----------------
 
@@ -500,8 +615,25 @@ class ProfessionalCloudTool:
             self.log("Running security checks...")
             findings = scanner.run_scan()
 
+            # Enhanced risk scoring
+            self.log("Calculating context-aware risk scores...")
+            findings = self.risk_scorer.score_findings(findings)
+
+            # Attack simulation
             simulator = AttackChainSimulator(SecurityLogger("attack.log"))
             self.last_attack_chains = simulator.simulate_attacks(findings)
+            
+            # Attack path analysis
+            self.log("Analyzing attack paths...")
+            path_graph = AttackPathGraph()
+            path_graph.build_graph(findings)
+            self.last_attack_paths = path_graph.get_top_attack_paths()
+            
+            # Drift detection
+            self.log("Detecting baseline drift...")
+            self.last_drift_report = self.drift_detector.detect_drift(findings)
+            self.drift_detector.save_baseline(findings)
+            
             self.last_findings = findings
 
             self.log(f"Scan completed. Findings: {len(findings)}", "success")
@@ -535,8 +667,25 @@ class ProfessionalCloudTool:
                 self.log("Running security checks...")
                 findings = scanner.run_scan()
 
+                # Enhanced risk scoring
+                self.log("Calculating context-aware risk scores...")
+                findings = self.risk_scorer.score_findings(findings)
+
+                # Attack simulation
                 simulator = AttackChainSimulator(SecurityLogger("attack.log"))
                 self.last_attack_chains = simulator.simulate_attacks(findings)
+                
+                # Attack path analysis
+                self.log("Analyzing attack paths...")
+                path_graph = AttackPathGraph()
+                path_graph.build_graph(findings)
+                self.last_attack_paths = path_graph.get_top_attack_paths()
+                
+                # Drift detection
+                self.log("Detecting baseline drift...")
+                self.last_drift_report = self.drift_detector.detect_drift(findings)
+                self.drift_detector.save_baseline(findings)
+                
                 self.last_findings = findings
 
                 self.log(f"Scan completed. Findings: {len(findings)}", "success")
@@ -571,8 +720,25 @@ class ProfessionalCloudTool:
                 self.log("Running security checks...")
                 findings = scanner.run_scan()
 
+                # Enhanced risk scoring
+                self.log("Calculating context-aware risk scores...")
+                findings = self.risk_scorer.score_findings(findings)
+
+                # Attack simulation
                 simulator = AttackChainSimulator(SecurityLogger("attack.log"))
                 self.last_attack_chains = simulator.simulate_attacks(findings)
+                
+                # Attack path analysis
+                self.log("Analyzing attack paths...")
+                path_graph = AttackPathGraph()
+                path_graph.build_graph(findings)
+                self.last_attack_paths = path_graph.get_top_attack_paths()
+                
+                # Drift detection
+                self.log("Detecting baseline drift...")
+                self.last_drift_report = self.drift_detector.detect_drift(findings)
+                self.drift_detector.save_baseline(findings)
+                
                 self.last_findings = findings
 
                 self.log(f"Scan completed. Findings: {len(findings)}", "success")
