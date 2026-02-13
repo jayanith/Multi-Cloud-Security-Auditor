@@ -58,9 +58,55 @@ class ProfessionalCloudTool:
         self.create_ui()
         self.check_internet()
 
+    # ---------------- STYLING ----------------
+    
+    def style_notebook_tabs(self):
+        """
+        Configure ttk.Notebook tab appearance.
+        
+        Why this is needed:
+        - ttk.Notebook tabs are NOT regular Tkinter widgets
+        - They ignore font, padding, and size parameters passed to notebook.add()
+        - Must use ttk.Style to override TNotebook.Tab theme elements
+        - This applies globally to all notebooks in the application
+        """
+        style = ttk.Style()
+        
+        # Set theme base (works cross-platform)
+        try:
+            style.theme_use('clam')  # Modern, customizable theme
+        except:
+            pass  # Fallback to default if clam unavailable
+        
+        # Configure TNotebook (the notebook container)
+        style.configure('TNotebook', 
+            background='#16213e',
+            borderwidth=0
+        )
+        
+        # Configure TNotebook.Tab (individual tab buttons)
+        style.configure('TNotebook.Tab',
+            background='#0f3460',      # Normal state background
+            foreground='#a0a0a0',      # Normal state text color
+            padding=[20, 12],          # [horizontal, vertical] padding
+            font=('Arial', 11, 'bold'), # Tab font
+            borderwidth=0
+        )
+        
+        # Selected tab state
+        style.map('TNotebook.Tab',
+            background=[('selected', '#1a1a2e')],  # Active tab background
+            foreground=[('selected', '#58a6ff')],  # Active tab text
+            expand=[('selected', [1, 1, 1, 0])]    # Expand selected tab slightly
+        )
+
     # ---------------- UI ----------------
 
     def create_ui(self):
+        # Configure ttk.Notebook tab styling BEFORE creating notebook
+        # ttk widgets ignore normal Tkinter sizing - they require ttk.Style configuration
+        self.style_notebook_tabs()
+        
         header = tk.Frame(self.root, bg=self.bg_dark)
         header.pack(fill="x", padx=30, pady=20)
 
@@ -457,20 +503,41 @@ class ProfessionalCloudTool:
         self.drift_text.delete("1.0", tk.END)
         
         if self.last_drift_report:
-            self.drift_text.insert(tk.END, f"📊 DRIFT ANALYSIS REPORT\n\n")
-            self.drift_text.insert(tk.END, f"✅ Fixed Issues: {self.last_drift_report['fixed_count']}\n")
-            self.drift_text.insert(tk.END, f"⚠️ New Risks: {self.last_drift_report['new_count']}\n")
-            self.drift_text.insert(tk.END, f"🔺 Worsened: {self.last_drift_report['worsened_count']}\n\n")
+            new_count = len(self.last_drift_report.get('new_risks', []))
+            fixed_count = len(self.last_drift_report.get('fixed_issues', []))
+            worsened_count = len(self.last_drift_report.get('worsened', []))
             
-            if self.last_drift_report['new_risks']:
-                self.drift_text.insert(tk.END, "\n━━━ NEW RISKS ━━━\n")
+            self.drift_text.insert(tk.END, f"\n╔═══════════════════════════════════════════════════════════╗\n")
+            self.drift_text.insert(tk.END, f"║  DRIFT SUMMARY\n")
+            self.drift_text.insert(tk.END, f"╚═══════════════════════════════════════════════════════════╝\n\n")
+            self.drift_text.insert(tk.END, f"  🔴 NEW RISKS:        {new_count}\n")
+            self.drift_text.insert(tk.END, f"  ✅ FIXED ISSUES:     {fixed_count}\n")
+            self.drift_text.insert(tk.END, f"  🟠 WORSENED:         {worsened_count}\n\n\n")
+            
+            if self.last_drift_report.get('new_risks'):
+                self.drift_text.insert(tk.END, "═════════════════════════════════════════════════════════════\n")
+                self.drift_text.insert(tk.END, "🔴 NEW RISKS DETECTED\n")
+                self.drift_text.insert(tk.END, "═════════════════════════════════════════════════════════════\n\n")
                 for risk in self.last_drift_report['new_risks'][:5]:
-                    self.drift_text.insert(tk.END, f"  • [{risk['severity']}] {risk['title']}\n")
+                    self.drift_text.insert(tk.END, f"  • [{risk['severity']}] {risk.get('title', risk.get('resource', 'Unknown'))}\n")
+                self.drift_text.insert(tk.END, "\n\n")
             
-            if self.last_drift_report['fixed_issues']:
-                self.drift_text.insert(tk.END, "\n━━━ FIXED ISSUES ━━━\n")
+            if self.last_drift_report.get('fixed_issues'):
+                self.drift_text.insert(tk.END, "═════════════════════════════════════════════════════════════\n")
+                self.drift_text.insert(tk.END, "✅ FIXED ISSUES\n")
+                self.drift_text.insert(tk.END, "═════════════════════════════════════════════════════════════\n\n")
                 for fix in self.last_drift_report['fixed_issues'][:5]:
-                    self.drift_text.insert(tk.END, f"  ✓ [{fix['severity']}] {fix['title']}\n")
+                    self.drift_text.insert(tk.END, f"  ✓ [{fix['severity']}] {fix.get('title', fix.get('resource', 'Unknown'))}\n")
+                self.drift_text.insert(tk.END, "\n\n")
+            
+            if self.last_drift_report.get('worsened'):
+                self.drift_text.insert(tk.END, "═════════════════════════════════════════════════════════════\n")
+                self.drift_text.insert(tk.END, "🟠 WORSENED CONFIGURATIONS\n")
+                self.drift_text.insert(tk.END, "═════════════════════════════════════════════════════════════\n\n")
+                for item in self.last_drift_report['worsened']:
+                    finding = item.get('finding', {})
+                    self.drift_text.insert(tk.END, f"  ⚠️  {finding.get('resource', 'Unknown')}: {item['old_severity']} → {item['new_severity']}\n")
+                self.drift_text.insert(tk.END, "\n")
         else:
             self.drift_text.insert(tk.END, "⏳ No drift analysis yet. Run a scan first.")
         
