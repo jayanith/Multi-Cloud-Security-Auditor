@@ -1,12 +1,17 @@
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Virtual environments
 env/
 venv/
 ENV/
+.venv/
+
+# Distribution / packaging
 build/
 develop-eggs/
 dist/
@@ -22,13 +27,11 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+PIPFILE.lock
 
-# Logs
+# Logs and reports
 *.log
 logs/
-*.log.*
-
-# Reports
 reports/
 *.html
 *.json
@@ -39,37 +42,30 @@ reports/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Credentials (NEVER commit these!)
+# Credentials - NEVER COMMIT!
 *.pem
 *.key
 *.json
 config.ini
 credentials.json
 service-account*.json
+*-key.json
+.env
+.aws/
+.azure/
+.gcp/
 
 # Temporary files
 *.tmp
 *.bak
-*.swp
 temp/
 tmp/
 
-# Backend/Demo files (not needed)
-backend/
-static/
-templates/
-app.py
-app_demo.py
-webapp.py
-main.py
-tool_pro.py
-cleanup_demo.py
-create_demo_env.py
-test_button_visibility.py
-run_app.bat
-run_webapp.bat
+# OS specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
