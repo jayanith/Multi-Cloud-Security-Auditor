@@ -617,7 +617,7 @@ class ProfessionalCloudTool:
 
             # Enhanced risk scoring
             self.log("Calculating context-aware risk scores...")
-            findings = self.risk_scorer.score_findings(findings)
+            findings = self.risk_scorer.score_all_findings(findings)
 
             # Attack simulation
             simulator = AttackChainSimulator(SecurityLogger("attack.log"))
@@ -631,8 +631,7 @@ class ProfessionalCloudTool:
             
             # Drift detection
             self.log("Detecting baseline drift...")
-            self.last_drift_report = self.drift_detector.detect_drift(findings)
-            self.drift_detector.save_baseline(findings)
+            self.last_drift_report = self.drift_detector.detect_drift('aws', findings)
             
             self.last_findings = findings
 
@@ -669,7 +668,7 @@ class ProfessionalCloudTool:
 
                 # Enhanced risk scoring
                 self.log("Calculating context-aware risk scores...")
-                findings = self.risk_scorer.score_findings(findings)
+                findings = self.risk_scorer.score_all_findings(findings)
 
                 # Attack simulation
                 simulator = AttackChainSimulator(SecurityLogger("attack.log"))
@@ -683,8 +682,7 @@ class ProfessionalCloudTool:
                 
                 # Drift detection
                 self.log("Detecting baseline drift...")
-                self.last_drift_report = self.drift_detector.detect_drift(findings)
-                self.drift_detector.save_baseline(findings)
+                self.last_drift_report = self.drift_detector.detect_drift('azure', findings)
                 
                 self.last_findings = findings
 
@@ -722,7 +720,7 @@ class ProfessionalCloudTool:
 
                 # Enhanced risk scoring
                 self.log("Calculating context-aware risk scores...")
-                findings = self.risk_scorer.score_findings(findings)
+                findings = self.risk_scorer.score_all_findings(findings)
 
                 # Attack simulation
                 simulator = AttackChainSimulator(SecurityLogger("attack.log"))
@@ -736,8 +734,7 @@ class ProfessionalCloudTool:
                 
                 # Drift detection
                 self.log("Detecting baseline drift...")
-                self.last_drift_report = self.drift_detector.detect_drift(findings)
-                self.drift_detector.save_baseline(findings)
+                self.last_drift_report = self.drift_detector.detect_drift('gcp', findings)
                 
                 self.last_findings = findings
 
