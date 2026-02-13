@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Reports
+reports/
+*.html
+*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Credentials (NEVER commit these!)
+*.pem
+*.key
+*.json
+config.ini
+credentials.json
+service-account*.json
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+temp/
+tmp/
+
+# Backend/Demo files (not needed)
+backend/
+static/
+templates/
+app.py
+app_demo.py
+webapp.py
+main.py
+tool_pro.py
+cleanup_demo.py
+create_demo_env.py
+test_button_visibility.py
+run_app.bat
+run_webapp.bat
