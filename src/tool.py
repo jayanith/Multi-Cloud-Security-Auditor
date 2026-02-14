@@ -673,12 +673,16 @@ class ProfessionalCloudTool:
         self.log_text.delete("1.0", tk.END)
 
         try:
-            os.environ["AWS_ACCESS_KEY_ID"] = ak
-            os.environ["AWS_SECRET_ACCESS_KEY"] = sk
-            os.environ["AWS_DEFAULT_REGION"] = region
-
             self.log("Authenticating with AWS...")
-            scanner = AWSScanner(SecurityLogger("scan.log"), region)
+            # Pass credentials directly to scanner instead of using environment variables
+            scanner = AWSScanner(SecurityLogger("scan.log"), region, access_key=ak, secret_key=sk)
+            
+            # Verify credentials before scanning
+            if not scanner.verify_credentials():
+                self.log("Authentication failed - Invalid AWS credentials", "error")
+                self.status_label.config(text="● Auth Failed", fg="#ff4757")
+                return
+            
             self.log("Running security checks...")
             findings = scanner.run_scan()
 
@@ -710,8 +714,13 @@ class ProfessionalCloudTool:
             self.status_label.config(text="● Complete", fg="#00ff88")
 
         except Exception as e:
-            self.log(f"Scan failed: {e}", "error")
-            self.status_label.config(text="● Failed", fg="#ff4757")
+            error_msg = str(e)
+            if "authentication" in error_msg.lower() or "credentials" in error_msg.lower():
+                self.log(f"Authentication failed: {e}", "error")
+                self.status_label.config(text="● Auth Failed", fg="#ff4757")
+            else:
+                self.log(f"Scan failed: {e}", "error")
+                self.status_label.config(text="● Failed", fg="#ff4757")
 
         finally:
             self.scan_btn.config(state="normal")

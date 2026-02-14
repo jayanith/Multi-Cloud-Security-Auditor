@@ -8,16 +8,32 @@ from botocore.exceptions import ClientError, NoCredentialsError
 from core.config import AWS_RULES
 
 class AWSScanner:
-    def __init__(self, logger, region='us-east-1'):
+    def __init__(self, logger, region='us-east-1', access_key=None, secret_key=None):
         self.logger = logger
         self.region = region
         self.findings = []
         
         try:
-            self.s3 = boto3.client('s3', region_name=region)
-            self.iam = boto3.client('iam', region_name=region)
-            self.ec2 = boto3.client('ec2', region_name=region)
-            self.sts = boto3.client('sts', region_name=region)
+            # Create clients with explicit credentials to avoid caching
+            if access_key and secret_key:
+                self.s3 = boto3.client('s3', region_name=region, 
+                                      aws_access_key_id=access_key,
+                                      aws_secret_access_key=secret_key)
+                self.iam = boto3.client('iam', region_name=region,
+                                       aws_access_key_id=access_key,
+                                       aws_secret_access_key=secret_key)
+                self.ec2 = boto3.client('ec2', region_name=region,
+                                       aws_access_key_id=access_key,
+                                       aws_secret_access_key=secret_key)
+                self.sts = boto3.client('sts', region_name=region,
+                                       aws_access_key_id=access_key,
+                                       aws_secret_access_key=secret_key)
+            else:
+                # Fallback to environment variables
+                self.s3 = boto3.client('s3', region_name=region)
+                self.iam = boto3.client('iam', region_name=region)
+                self.ec2 = boto3.client('ec2', region_name=region)
+                self.sts = boto3.client('sts', region_name=region)
         except NoCredentialsError:
             self.logger.error("AWS credentials not found. Configure AWS CLI or set environment variables.")
             raise
@@ -292,9 +308,8 @@ class AWSScanner:
     
     def run_scan(self):
         """Execute full AWS security scan"""
-        if not self.verify_credentials():
-            self.logger.error("Scan aborted due to authentication failure")
-            raise Exception("AWS authentication failed - check your credentials")
+        # Credentials already verified in verify_credentials() call from GUI
+        # Don't call verify_credentials() again here to avoid duplicate checks
         
         self.scan_s3_buckets()
         self.scan_iam_policies()
